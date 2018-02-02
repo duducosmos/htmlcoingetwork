@@ -129,7 +129,6 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
         }
         block;
         unsigned char pchPadding0[64];
-        uint256 hash1;
         unsigned char pchPadding1[64];
         unsigned char pchPadding2[64];
         uint256 hash1;
