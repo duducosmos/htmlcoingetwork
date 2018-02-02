@@ -524,16 +524,16 @@ UniValue getwork(const JSONRPCRequest& request)
 
         // Pre-build hash buffers
         char pmidstate[32];
-        char pdata[128];
+        char pdata[189];
         char phash1[64];
         FormatHashBuffers(pblock, pmidstate, pdata, phash1);
 
         arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
         UniValue result(UniValue::VOBJ);
-        result.push_back(Pair("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))); // deprecated
+        //result.push_back(Pair("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))); // deprecated
         result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
-        result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
+        //result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
         result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
         return result;
     }
@@ -542,11 +542,11 @@ UniValue getwork(const JSONRPCRequest& request)
         // Parse parameters
         std::vector<unsigned char> vchData = ParseHex(request.params[0].get_str());
 
-        if (vchData.size() != 128) {
-            LogPrintf("%s: Invalid parameter vchData.size(): %u\n", __func__, vchData.size());
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
-        }
-        CBlock* pdata = (CBlock*)&vchData[0];
+        //if (vchData.size() != 128) {
+        //    LogPrintf("%s: Invalid parameter vchData.size(): %u\n", __func__, vchData.size());
+        //    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
+        //}
+        JOHN* pdata = (JOHN*)&vchData[0];
 
         /* Dump block data received */
         unsigned int i, size;
@@ -559,7 +559,7 @@ UniValue getwork(const JSONRPCRequest& request)
         LogPrintf("%s: hashMerkleRoot pre-ByteReverse: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
 
         // Byte reverse
-        for (int i = 0; i < 128/4; i++)
+        for (int i = 0; i < 184/4; i++)
             ((unsigned int*)pdata)[i] = ByteReverse(((unsigned int*)pdata)[i]);
 
         /* Dump block data received */
@@ -569,6 +569,13 @@ UniValue getwork(const JSONRPCRequest& request)
             LogPrintf("%02X", ((unsigned char *)&vchData[0])[i]);
         LogPrintf("\n");
 
+        LogPrintf("%s: nVersion: %u\n", __func__, pdata->nVersion);
+        LogPrintf("%s: hashPrevBlock: %s\n", __func__, pdata->hashPrevBlock.ToString().c_str());
+        LogPrintf("%s: hashMerkleRoot: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
+        LogPrintf("%s: nTime: %u\n", __func__, pdata->nTime);
+        LogPrintf("%s: nBits: %u\n", __func__, pdata->nBits);
+        LogPrintf("%s: nNonce: %u\n", __func__, pdata->nNonce);
+        
         // Get saved block
         if (!mapNewBlock.count(pdata->hashMerkleRoot)) {
             LogPrintf("%s: Previous block contents not found. hashMerkleRoot: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
@@ -580,7 +587,9 @@ UniValue getwork(const JSONRPCRequest& request)
         pblock->nTime = pdata->nTime;
         pblock->nNonce = pdata->nNonce;
 
-        CMutableTransaction newTx;
+	    LogPrintf("Creating block transaction.\n");
+        CMutableTransaction newTx(*pblock->vtx[0]);
+        
         // Use CMutableTransaction when creating a new transaction instead of CTransaction.  CTransaction public variables are all const now.
         newTx.vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second; // Oh, why? because vin is const in CTransaction now.
         pblock->vtx[0] = MakeTransactionRef(std::move(newTx));
