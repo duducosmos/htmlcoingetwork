@@ -9,10 +9,11 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 #include "crypto/common.h"
+#include "util.h"
 
-uint256 CBlockHeader::GetHash() const
+uint256 CBlockHeader::GetHash(bool print) const
 {
-    return SerializeHash(*this);
+    return SerializeHash(*this, print);
 }
 
 uint256 CBlockHeader::GetHashWithoutSign() const
