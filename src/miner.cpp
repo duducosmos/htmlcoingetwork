@@ -196,7 +196,7 @@ bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet,
         if (!ProcessNewBlock(chainparams, shared_pblock, true, &fNewBlock))
             return error("CheckWork: block not accepted");
     }
-    LogPrintf("%s: Leaving CheckWork\n");
+    LogPrintf("Leaving CheckWork\n");
     return true;
 }
 

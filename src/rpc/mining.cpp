@@ -600,7 +600,7 @@ UniValue getwork(const JSONRPCRequest& request)
 
         assert(pwalletMain != NULL);
         const CChainParams& chainParams = Params();
-        LogPrintf("%s: Entering CheckWork\n");
+        LogPrintf("Entering CheckWork\n");
         return CheckWork(chainParams, pblock, *pwalletMain, *pMiningKey);
     }
 }
