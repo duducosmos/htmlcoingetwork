@@ -119,11 +119,21 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
             unsigned int nTime;
             unsigned int nBits;
             unsigned int nNonce;
+            uint256 hashStateRoot;
+            uint256 hashUTXORoot;
+            uint256 zeros;
+            unsigned int effs;
+            char ending;
+            unsigned int zeros2;
+            unsigned int blocksize;
         }
         block;
         unsigned char pchPadding0[64];
         uint256 hash1;
         unsigned char pchPadding1[64];
+        unsigned char pchPadding2[64];
+        uint256 hash1;
+        unsigned char pchPadding3[64];
     }
     tmp;
     memset(&tmp, 0, sizeof(tmp));
@@ -134,9 +144,14 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
     tmp.block.nTime          = pblock->nTime;
     tmp.block.nBits          = pblock->nBits;
     tmp.block.nNonce         = pblock->nNonce;
-
+    tmp.block.hashStateRoot  = pblock->hashStateRoot;
+    tmp.block.hashUTXORoot   = pblock->hashUTXORoot;
+    tmp.block.effs           = 0xFFFFFFFF;
+    tmp.block.zeros2         = 0x00000005;
+    tmp.block.blocksize      = 0xa8000000;
+    
     FormatHashBlocks(&tmp.block, sizeof(tmp.block));
-    FormatHashBlocks(&tmp.hash1, sizeof(tmp.hash1));
+    //FormatHashBlocks(&tmp.hash1, sizeof(tmp.hash1));
 
     // Byte swap all the input buffer
     for (unsigned int i = 0; i < sizeof(tmp)/4; i++)
@@ -145,17 +160,21 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
     // Precalc the first half of the first hash, which stays constant
     SHA256Transform(pmidstate, &tmp.block, pSHA256InitState);
 
-    memcpy(pdata, &tmp.block, 128);
-    memcpy(phash1, &tmp.hash1, 64);
+    memcpy(pdata, &tmp.block, sizeof(tmp.block));
+    //memcpy(phash1, &tmp.hash1, 64);
 }
 
 bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
-    uint256 hash = pblock->GetHash();
+    uint256 hash = pblock->GetHash(true);
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
-    if (UintToArith256(hash) > hashTarget)
+    if (UintToArith256(hash) > hashTarget) {
+        LogPrintf("Hash target not met\n");
+    	LogPrintf("Target: %s\n", hashTarget.ToString().c_str());
+    	LogPrintf("Hash: %s\n", hash.ToString().c_str());
         return false;
+    }
 
     // Found a solution
     {
