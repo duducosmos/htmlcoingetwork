@@ -1,3 +1,4 @@
 [submodule "src/cpp-ethereum"]
 	path = src/cpp-ethereum
 	url = https://github.com/HTMLCOIN/cpp-ethereum.git
+	ignore = dirty
