@@ -12,11 +12,12 @@
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
+#include "util.h"
 
 #include <vector>
 
 #include <openssl/sha.h>
-
+void hexDump (const void *addr, int len); 
 typedef uint256 ChainCode;
 
 /** A hasher class for Bitcoin's 256-bit hash (double SHA-256). */
@@ -205,6 +206,18 @@ uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL
     ss << obj;
     return ss.GetHash();
 }
+
+template<typename T>
+uint256 SerializeHash(const T& obj, bool print=false)
+{
+    CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
+    ss << obj;
+    if (print) {
+	hexDump(&obj, sizeof(obj));
+    }
+    return ss.GetHash();
+}
+
 
 unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char>& vDataToHash);
 
