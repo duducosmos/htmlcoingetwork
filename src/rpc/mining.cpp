@@ -245,6 +245,7 @@ UniValue generatetoaddress(const JSONRPCRequest& request)
         nMaxTries = request.params[2].get_int();
     }
 
+    //Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG
     CBitcoinAddress address(request.params[1].get_str());
     if (!address.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
@@ -436,6 +437,12 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos) {
 
 UniValue getwork(const JSONRPCRequest& request)
 {
+    boost::mutex newTaskMutex;
+    
+    static boost::mutex synchro;
+    boost::unique_lock<boost::mutex> lock(synchro);
+    LOCK(cs_main);
+
     if (request.fHelp || request.params.size() > 1)
         throw std::runtime_error(
             "getwork ( \"data\" )\n"
@@ -445,9 +452,7 @@ UniValue getwork(const JSONRPCRequest& request)
             "1. \"data\"       (string, optional) The hex encoded data to solve\n"
             "\nResult (when 'data' is not specified):\n"
             "{\n"
-            "  \"midstate\" : \"xxxx\",   (string) The precomputed hash state after hashing the first half of the data (DEPRECATED)\n" // deprecated
             "  \"data\" : \"xxxxx\",      (string) The block data\n"
-            "  \"hash1\" : \"xxxxx\",     (string) The formatted hash buffer for second hash (DEPRECATED)\n" // deprecated
             "  \"target\" : \"xxxx\"      (string) The little endian hash target\n"
             "}\n"
             "\nResult (when 'data' is specified):\n"
@@ -467,27 +472,31 @@ UniValue getwork(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "HTMLCOIN is downloading blocks...");
 
     typedef std::map<uint256, std::pair<CBlock*, CScript> > mapNewBlock_t;
+//    typedef std::map<uint256, std::pair<std::shared_ptr<CBlock>, CScript> > mapNewBlock_t;
     static mapNewBlock_t mapNewBlock;    // FIXME: thread safety
-    static std::vector<CBlockTemplate*> vNewBlockTemplate;
+    static std::vector<std::shared_ptr<CBlockTemplate> > vNewBlockTemplate;
 
     if (request.params.size() == 0)
     {
+        // asking for new work
         // Update block
         static unsigned int nTransactionsUpdatedLast;
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
-        static std::unique_ptr<CBlockTemplate> pblocktemplate;
+        static std::shared_ptr<CBlockTemplate> pblocktemplate;
+//        static std::unique_ptr<CBlockTemplate> pblocktemplate;
 
+        // is the block new, or has the block changed, or the list of transactions changed, or has it been > 5 seconds?
         if (pindexPrev != chainActive.Tip() ||
             (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
         {
+            // check if the height has changed
             if (pindexPrev != chainActive.Tip())
             {
                 // Deallocate old blocks since they're obsolete now
+                boost::unique_lock<boost::mutex> lock(newTaskMutex);
                 mapNewBlock.clear();
-                BOOST_FOREACH(CBlockTemplate* pblocktemplate, vNewBlockTemplate)
-                    delete pblocktemplate;
-                vNewBlockTemplate.clear();
+		vNewBlockTemplate.clear();
             }
 
             // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -499,10 +508,19 @@ UniValue getwork(const JSONRPCRequest& request)
             nStart = GetTime();
 
             // Create new block
-            CScript scriptDummy = CScript() << OP_TRUE;
-            pblocktemplate = BlockAssembler(Params()).CreateNewBlock(scriptDummy);
-            if (!pblocktemplate)
-                throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            //Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG
+	    CBitcoinAddress address("Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG");
+	    if (!address.IsValid())
+        	throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+
+	    boost::shared_ptr<CReserveScript> coinbaseScript(new CReserveScript());
+	    coinbaseScript->reserveScript = GetScriptForDestination(address.Get());
+            //std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript));
+            pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
+	    vNewBlockTemplate.push_back(pblocktemplate);
+
+            if (!pblocktemplate.get())
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
 
             // Need to update only after we know CreateNewBlock succeeded
             pindexPrev = pindexPrevNew;
@@ -517,11 +535,17 @@ UniValue getwork(const JSONRPCRequest& request)
 
         // Update nExtraNonce
         static unsigned int nExtraNonce = 0;
-        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+//            IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
+	    IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+		//IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
         // Save
         LogPrintf("%s: mapNewBlock save hashMerkleRoot: %s\n", __func__, pblock->hashMerkleRoot.ToString().c_str());
-        mapNewBlock[pblock->hashMerkleRoot] = std::make_pair(pblock, pblock->vtx[0]->vin[0].scriptSig);
+        {
+            boost::unique_lock<boost::mutex> lock(newTaskMutex);
+            mapNewBlock[pblock->hashMerkleRoot] = std::make_pair(pblock, pblock->vtx[0]->vin[0].scriptSig);
+        }
+
 
         // Pre-build hash buffers
         char pmidstate[32];
@@ -532,9 +556,9 @@ UniValue getwork(const JSONRPCRequest& request)
         arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
         UniValue result(UniValue::VOBJ);
-        //result.push_back(Pair("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))); // deprecated
+//        result.push_back(Pair("midstate", HexStr(BEGIN(pmidstate), END(pmidstate)))); // deprecated
         result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
-        //result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
+//        result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
         result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
         return result;
     }
@@ -543,10 +567,10 @@ UniValue getwork(const JSONRPCRequest& request)
         // Parse parameters
         std::vector<unsigned char> vchData = ParseHex(request.params[0].get_str());
 
-        //if (vchData.size() != 128) {
-        //    LogPrintf("%s: Invalid parameter vchData.size(): %u\n", __func__, vchData.size());
-        //    throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
-        //}
+//        if (vchData.size() != 128) {
+//            LogPrintf("%s: Invalid parameter vchData.size(): %u\n", __func__, vchData.size());
+//            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
+//        }
         JOHN* pdata = (JOHN*)&vchData[0];
 
         /* Dump block data received */
@@ -560,7 +584,7 @@ UniValue getwork(const JSONRPCRequest& request)
         LogPrintf("%s: hashMerkleRoot pre-ByteReverse: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
 
         // Byte reverse
-        for (int i = 0; i < 184/4; i++)
+        for (int i = 0; i < 80/4; i++)
             ((unsigned int*)pdata)[i] = ByteReverse(((unsigned int*)pdata)[i]);
 
         /* Dump block data received */
@@ -570,6 +594,7 @@ UniValue getwork(const JSONRPCRequest& request)
             LogPrintf("%02X", ((unsigned char *)&vchData[0])[i]);
         LogPrintf("\n");
 
+
         LogPrintf("%s: nVersion: %u\n", __func__, pdata->nVersion);
         LogPrintf("%s: hashPrevBlock: %s\n", __func__, pdata->hashPrevBlock.ToString().c_str());
         LogPrintf("%s: hashMerkleRoot: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
@@ -577,29 +602,55 @@ UniValue getwork(const JSONRPCRequest& request)
         LogPrintf("%s: nBits: %u\n", __func__, pdata->nBits);
         LogPrintf("%s: nNonce: %u\n", __func__, pdata->nNonce);
         
-        // Get saved block
+        // Get saved block -- put a lock here
         if (!mapNewBlock.count(pdata->hashMerkleRoot)) {
             LogPrintf("%s: Previous block contents not found. hashMerkleRoot: %s\n", __func__, pdata->hashMerkleRoot.ToString().c_str());
-            throw JSONRPCError(RPC_VERIFY_ERROR, "Previous block contents not found");
+	    return false;
+//            throw JSONRPCError(RPC_VERIFY_ERROR, "Previous block contents not found");
         }
 
+	LogPrintf("Getting cached block\n");
         CBlock* pblock = mapNewBlock[pdata->hashMerkleRoot].first;
+        CScript important = mapNewBlock[pdata->hashMerkleRoot].second;
 
+	LogPrintf("Setting block time.\n");
         pblock->nTime = pdata->nTime;
+	LogPrintf("Setting block nonce.\n");
         pblock->nNonce = pdata->nNonce;
 
-	    LogPrintf("Creating block transaction.\n");
+	LogPrintf("Creating block transaction.\n");
         CMutableTransaction newTx(*pblock->vtx[0]);
-        
+	//newTx.vin.resize(1);
         // Use CMutableTransaction when creating a new transaction instead of CTransaction.  CTransaction public variables are all const now.
-        newTx.vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second; // Oh, why? because vin is const in CTransaction now.
+        LogPrintf("Updating scriptSig");
+	if (newTx.vin.size()<1) {
+		newTx.vin.resize(1);
+	}
+        newTx.vin[0].scriptSig = important; // Oh, why? because vin is const in CTransaction now.
+	LogPrintf("Set Tx scriptSig\n");
         pblock->vtx[0] = MakeTransactionRef(std::move(newTx));
+        //pblock->vtx[0] = MakeTransactionRef(CTransaction(newTx));
+	LogPrintf("Set vtx transaction\n");
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+	LogPrintf("Get blockMerkleRoot\n");
 
         LogPrintf("%s: getwork Block submitted: %s", __func__, pblock->ToString().c_str());
+	/*bool cpow = CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus());
+	LogPrintf("CheckProofOfWork: %b", cpow);
+
+	if (cpow) {
+		std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
+		if (!ProcessNewBlock(Params(), shared_pblock, true, NULL))
+			throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+		return true;
+	} else {
+		return false;
+	} */
 
         assert(pwalletMain != NULL);
+        LogPrintf("Wallet asserted.\n");
         const CChainParams& chainParams = Params();
+        LogPrintf("CChainParams set.\n");
         LogPrintf("Entering CheckWork\n");
         return CheckWork(chainParams, pblock, *pwalletMain, *pMiningKey);
     }

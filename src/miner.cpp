@@ -181,14 +181,14 @@ bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet,
         if (pblock->hashPrevBlock != chainActive.Tip()->GetBlockHash())
             return error("Generated block is stale!");
 
-        // Remove key from key pool
-        reservekey.KeepKey();
-
-        // Track how many getdata requests this block gets
-        {
-            LOCK(wallet.cs_wallet);
-            wallet.mapRequestCount[pblock->GetHash()] = 0;
-        }
+//        // Remove key from key pool
+//        reservekey.KeepKey();
+//
+//        // Track how many getdata requests this block gets
+//        {
+//            LOCK(wallet.cs_wallet);
+//            wallet.mapRequestCount[pblock->GetHash()] = 0;
+//        }
 
         // Process this block the same as if we had received it from another node
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);

@@ -28,6 +28,7 @@
 #include <boost/shared_ptr.hpp>
 #include <univalue.h>
 
+
 using namespace std;
 struct JOHN
 {
