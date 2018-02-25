@@ -509,7 +509,9 @@ UniValue getwork(const JSONRPCRequest& request)
 
             // Create new block
             //Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG
-	    CBitcoinAddress address("Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG");
+	    //CBitcoinAddress address("Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG");
+	    std::string targetWallet = GetArg("-targetaddress","Has15oUPUasz7WdiEh4x6cJiZvHzGkEZZG");
+	    CBitcoinAddress address(targetWallet);
 	    if (!address.IsValid())
         	throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
 
