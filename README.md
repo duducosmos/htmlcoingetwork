@@ -1,4 +1,6 @@
-Added getwork for GPU mining.
+Added getwork for GPU mining.  
+
+It's on the MAIN BRANCH in this repository.
 
 When executing htmlcoind, you MUST UPDATE the targetaddress to use your wallet address, otherwise it pays coins to my wallet.
 
