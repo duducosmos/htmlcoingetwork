@@ -1,13 +1,17 @@
 Added getwork for GPU mining.
 
-You MUST UPDATE the targetaddress to use your wallet address, otherwise it pays coins to my wallet.
+When executing htmlcoind, you MUST UPDATE the targetaddress to use your wallet address, otherwise it pays coins to my wallet.
 
-Here are commands I use for starting htmlcoind, ccminer, bfgminer.
+Use BFGminer for OpenCL/AMD.
+Use CCminer for CUDA/Nvidia.
+
+Here are commands I use for starting htmlcoind, ccminer, bfgminer.  Please note I'm using my address under -targetaddress
 
 Please note, ccminer only has the changes in the LINUX branch. 
 
 BFGminer should work on any platform, as should htmlcoind.
 
+There are no binaries, you must build.
 
 ./htmlcoind -datadir=/Users/username/Library/Application Support/HTMLCOIN -port=4894 -rpcport=4876 -rpcuser=user -rpcpassword=pass -rpcallowip=127.0.0.1 -targetaddress=HYwDsTGXQrZQ739Q9Ca8Lwdtcz66SrF8n6
 
